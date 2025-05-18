@@ -1,0 +1,682 @@
+(function() {
+    // Конфигурация чат-бота
+    const config = {
+        apiUrl: "https://Mihan.pythonanywhere.com/api/chat",  // URL вашего API (изменить после деплоя)
+        botName: 'САВБЕС Ассистент',
+        primaryColor: '#ff7043',  // Оранжевый цвет САВБЕС
+        welcomeMessage: 'Здравствуйте! Я виртуальный помощник компании САВБЕС. Чем могу помочь? Вы можете спросить о наших услугах, ценах или процессе работы.'
+    };
+
+    // Создаем стили для чат-бота
+    const styles = document.createElement('style');
+    styles.textContent = `
+        .savbes-chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .savbes-chat-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: ${config.primaryColor};
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        .savbes-chat-button:hover {
+            background-color: #ff5722;
+        }
+
+        .savbes-chat-button svg {
+            width: 30px;
+            height: 30px;
+            fill: white;
+        }
+
+        .savbes-chat-container {
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 350px;
+            height: 500px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(20px);
+        }
+
+        .savbes-chat-container.active {
+            opacity: 1;
+            pointer-events: all;
+            transform: translateY(0);
+        }
+
+        .savbes-chat-header {
+            padding: 15px;
+            background-color: ${config.primaryColor};
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .savbes-chat-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+
+        .savbes-chat-title img {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+        }
+
+        .savbes-close-chat {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .savbes-messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .savbes-message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 5px;
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+
+        .savbes-assistant-message {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+        }
+
+        .savbes-user-message {
+            background-color: ${config.primaryColor};
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+
+        .savbes-input-area {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        .savbes-user-input {
+            flex-grow: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+
+        .savbes-send-button {
+            background-color: ${config.primaryColor};
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-left: 10px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .savbes-send-button:hover {
+            background-color: #ff5722;
+        }
+
+        /* Стили для формы контактов */
+        .savbes-contact-form {
+            background-color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            align-self: center;
+            width: 90%;
+        }
+
+        .savbes-form-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: ${config.primaryColor};
+        }
+
+        .savbes-form-input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+        }
+
+        .savbes-form-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .savbes-form-submit, .savbes-form-cancel {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: medium;
+        }
+
+        .savbes-form-submit {
+            background-color: ${config.primaryColor};
+            color: white;
+            flex-grow: 2;
+            margin-right: 5px;
+        }
+
+        .savbes-form-cancel {
+            background-color: #f1f1f1;
+            flex-grow: 1;
+        }
+
+        @media (max-width: 480px) {
+            .savbes-chat-container {
+                width: calc(100% - 40px);
+                height: calc(100% - 140px);
+                bottom: 80px;
+            }
+        }
+    `;
+    document.head.appendChild(styles);
+
+    // Создаем HTML-структуру чат-бота
+    const chatWidget = document.createElement('div');
+    chatWidget.className = 'savbes-chat-widget';
+    chatWidget.innerHTML = `
+        <div class="savbes-chat-button" id="savbes-chat-toggle">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z"/>
+                <path d="M7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/>
+            </svg>
+        </div>
+
+        <div class="savbes-chat-container" id="savbes-chat-container">
+            <div class="savbes-chat-header">
+                <div class="savbes-chat-title">
+                    <span>${config.botName}</span>
+                </div>
+                <button class="savbes-close-chat" id="savbes-close-chat">×</button>
+            </div>
+
+            <div class="savbes-messages" id="savbes-chat-messages">
+                <div class="savbes-message savbes-assistant-message">
+                    ${config.welcomeMessage}
+                </div>
+            </div>
+
+            <div class="savbes-input-area">
+                <input type="text" class="savbes-user-input" id="savbes-user-input" placeholder="Введите ваше сообщение...">
+                <button class="savbes-send-button" id="savbes-send-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" width="18px" height="18px">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(chatWidget);
+
+    // Генерируем уникальный ID сессии
+    const sessionId = Math.random().toString(36).substring(2, 15);
+
+    // Функция для показа формы контактов
+    function showContactForm() {
+        const messagesDiv = document.getElementById('savbes-chat-messages');
+        
+        // Создаем форму
+        const formDiv = document.createElement('div');
+        formDiv.className = 'savbes-contact-form';
+        formDiv.innerHTML = `
+            <div class="savbes-form-title">Оставьте ваши контактные данные</div>
+            <input type="text" class="savbes-form-input" id="savbes-name-input" placeholder="Ваше имя">
+            <input type="tel" class="savbes-form-input" id="savbes-phone-input" placeholder="Ваш телефон" required>
+            <input type="email" class="savbes-form-input" id="savbes-email-input" placeholder="Ваш email (опционально)">
+            <div class="savbes-form-buttons">
+                <button class="savbes-form-submit">Отправить</button>
+                <button class="savbes-form-cancel">Отмена</button>
+            </div>
+        `;
+        
+        // Добавляем форму в чат
+        messagesDiv.appendChild(formDiv);
+        
+        // Прокручиваем чат вниз
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Фокусируемся на поле ввода имени
+        document.getElementById('savbes-name-input').focus();
+        
+        // Обработчики для кнопок
+        formDiv.querySelector('.savbes-form-submit').addEventListener('click', function() {
+            submitContactForm(formDiv);
+        });
+        
+        formDiv.querySelector('.savbes-form-cancel').addEventListener('click', function() {
+            // Удаляем форму
+            formDiv.remove();
+            
+            // Отправляем отказ
+            sendMessage('Не хочу оставлять контакты');
+        });
+        
+        // Добавляем обработку Enter для отправки формы
+        const phoneInput = document.getElementById('savbes-phone-input');
+        phoneInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                submitContactForm(formDiv);
+            }
+        });
+    }
+    
+    // Функция отправки данных формы
+    function submitContactForm(formDiv) {
+        const name = document.getElementById('savbes-name-input').value;
+        const phone = document.getElementById('savbes-phone-input').value;
+        const email = document.getElementById('savbes-email-input').value;
+        
+        if (phone) {
+            // Удаляем форму
+            formDiv.remove();
+            
+            // Отправляем данные в чат
+            let contactText = ``;
+            if (name) contactText += `${name}, `;
+            contactText += `${phone}`;
+            if (email) contactText += `, ${email}`;
+            
+            // Сохраняем данные в localStorage для автозаполнения форм на сайте
+            saveClientData(phone, name, email);
+            
+            // Отправляем в чат
+            sendMessage(contactText);
+        } else {
+            alert('Пожалуйста, введите номер телефона');
+        }
+    }
+
+    // ====== Функции для работы с данными клиента и формами =======
+
+    // Функция для сохранения данных в localStorage
+    function saveClientData(phone, name, email, calcData) {
+        try {
+            // Сохраняем контактные данные, если они не пустые
+            if (phone && phone.length > 5) localStorage.setItem('savbes_phone', phone);
+            if (name && name.length > 0) localStorage.setItem('savbes_name', name);
+            if (email && email.includes('@')) localStorage.setItem('savbes_email', email);
+            
+            // Сохраняем данные расчета
+            if (calcData) localStorage.setItem('savbes_calc_data', JSON.stringify(calcData));
+            
+            console.log("Данные клиента сохранены:", phone, name, email);
+            
+            // Заполняем формы на странице
+            fillForms();
+            
+            return true;
+        } catch (error) {
+            console.error("Ошибка при сохранении данных клиента:", error);
+            return false;
+        }
+    }
+
+    // Функция для заполнения форм на странице
+    function fillForms() {
+        try {
+            const phone = localStorage.getItem('savbes_phone');
+            const name = localStorage.getItem('savbes_name');
+            const email = localStorage.getItem('savbes_email');
+            const calcData = localStorage.getItem('savbes_calc_data');
+            
+            // Если нет данных, выходим
+            if (!phone && !name && !email && !calcData) return;
+            
+            console.log("Попытка заполнить формы данными:", phone, name, email);
+            
+            // Заполняем все формы на странице
+            document.querySelectorAll('form').forEach(function(form) {
+                // Заполняем поля телефона
+                if (phone) {
+                    const phoneInputs = form.querySelectorAll('input[type="tel"], input[name="phone"]');
+                    phoneInputs.forEach(input => {
+                        if (!input.value || input.value === '' || input.value === '0') {
+                            input.value = phone;
+                            // Имитируем событие ввода для активации событий Tilda
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            console.log("Заполнено поле телефона:", input);
+                            
+                            // Добавляем слушатель события ввода для обработки очистки
+                            if (!input._hasInputListener) {
+                                input.addEventListener('input', function() {
+                                    if (this.value === '' || this.value === '0') {
+                                        // Если поле очищено пользователем, удаляем данные из localStorage
+                                        localStorage.removeItem('savbes_phone');
+                                        console.log('Телефон удален из localStorage после очистки поля');
+                                    }
+                                });
+                                input._hasInputListener = true;
+                            }
+                        }
+                    });
+                }
+                
+                // Заполняем поля имени
+                if (name) {
+                    const nameInputs = form.querySelectorAll('input[name="name"]');
+                    nameInputs.forEach(input => {
+                        if (!input.value || input.value === '' || input.value === '0') {
+                            input.value = name;
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            console.log("Заполнено поле имени:", input);
+                            
+                            // Добавляем слушатель события ввода для обработки очистки
+                            if (!input._hasInputListener) {
+                                input.addEventListener('input', function() {
+                                    if (this.value === '' || this.value === '0') {
+                                        // Если поле очищено пользователем, удаляем данные из localStorage
+                                        localStorage.removeItem('savbes_name');
+                                        console.log('Имя удалено из localStorage после очистки поля');
+                                    }
+                                });
+                                input._hasInputListener = true;
+                            }
+                        }
+                    });
+                }
+                
+                // Заполняем поля email
+                if (email) {
+                    const emailInputs = form.querySelectorAll('input[type="email"], input[name="email"]');
+                    emailInputs.forEach(input => {
+                        if (!input.value || input.value === '' || input.value === '0') {
+                            input.value = email;
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            console.log("Заполнено поле email:", input);
+                            
+                            // Добавляем слушатель события ввода для обработки очистки
+                            if (!input._hasInputListener) {
+                                input.addEventListener('input', function() {
+                                    if (this.value === '' || this.value === '0') {
+                                        // Если поле очищено пользователем, удаляем данные из localStorage
+                                        localStorage.removeItem('savbes_email');
+                                        console.log('Email удален из localStorage после очистки поля');
+                                    }
+                                });
+                                input._hasInputListener = true;
+                            }
+                        }
+                    });
+                }
+                
+                // Добавляем данные расчета
+                if (calcData) {
+                    let commentField = form.querySelector('input[name="comment"]');
+                    if (!commentField) {
+                        commentField = document.createElement('input');
+                        commentField.type = 'hidden';
+                        commentField.name = 'comment';
+                        form.appendChild(commentField);
+                    }
+                    commentField.value = 'Данные расчета: ' + calcData;
+                    console.log("Добавлены данные расчета в форму");
+                }
+            });
+        } catch (error) {
+            console.error("Ошибка при заполнении форм:", error);
+        }
+    }
+
+    // Восстановление данных после валидации
+    function setupFormValidationHandlers() {
+        // Обрабатываем событие отправки формы
+        document.addEventListener('submit', function(e) {
+            if (e.target.tagName === 'FORM') {
+                // Сохраняем данные формы перед отправкой для возможного восстановления
+                const nameInput = e.target.querySelector('input[name="name"]');
+                const phoneInput = e.target.querySelector('input[name="phone"]');
+                const emailInput = e.target.querySelector('input[name="email"]');
+                
+                if (nameInput && nameInput.value) localStorage.setItem('savbes_name', nameInput.value);
+                if (phoneInput && phoneInput.value) localStorage.setItem('savbes_phone', phoneInput.value);
+                if (emailInput && emailInput.value) localStorage.setItem('savbes_email', emailInput.value);
+                
+                console.log("Сохранены данные перед отправкой формы");
+            }
+        });
+        
+        // Восстанавливаем данные после ошибки валидации
+        document.addEventListener('invalid', function(e) {
+            console.log("Обнаружена ошибка валидации, восстанавливаем данные");
+            // Ждем немного после ошибки валидации и восстанавливаем данные
+            setTimeout(fillForms, 500);
+        }, true);
+    }
+
+    // Функция для извлечения данных из сообщения
+    function extractClientDataFromMessage(message) {
+        // Извлекаем телефон
+        const phoneRegex = /(\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/;
+        const phoneMatch = message.match(phoneRegex);
+        const phone = phoneMatch ? phoneMatch[0] : null;
+        
+        // Извлекаем email
+        const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+        const emailMatch = message.match(emailRegex);
+        const email = emailMatch ? emailMatch[0] : null;
+        
+        // Извлекаем имя (предполагаем, что имя в начале сообщения)
+        let name = null;
+        const nameRegex = /^([А-Яа-яЁё]+)[\s,\.]/;
+        const nameMatch = message.match(nameRegex);
+        if (nameMatch) {
+            name = nameMatch[1];
+        } else if (message.split(' ').length <= 3 && !phone && !email) {
+            // Если сообщение короткое и не содержит контактных данных, возможно это имя
+            name = message.trim();
+        }
+        
+        return { phone, email, name };
+    }
+
+    // ====== Обработчики событий для чат-бота =======
+
+    document.getElementById('savbes-chat-toggle').addEventListener('click', function() {
+        document.getElementById('savbes-chat-container').classList.toggle('active');
+    });
+
+    document.getElementById('savbes-close-chat').addEventListener('click', function() {
+        document.getElementById('savbes-chat-container').classList.remove('active');
+    });
+
+    // Функция для добавления сообщений в чат
+    function addMessage(message, isUser) {
+        const messagesDiv = document.getElementById('savbes-chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `savbes-message ${isUser ? 'savbes-user-message' : 'savbes-assistant-message'}`;
+
+        // Разбиваем сообщение на строки, если есть \n
+        const formattedMessage = message.replace(/\n/g, '<br>');
+        
+        // Проверяем наличие метки формы
+        if (!isUser && message.includes("[SHOW_CONTACT_FORM]")) {
+            // Удаляем метку из сообщения
+            const cleanMessage = message.replace("[SHOW_CONTACT_FORM]", "");
+            messageDiv.innerHTML = cleanMessage;
+            
+            // Добавляем сообщение в чат
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            
+            // Показываем форму контактов с небольшой задержкой
+            setTimeout(showContactForm, 500);
+        } else {
+            messageDiv.innerHTML = formattedMessage;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Если это сообщение пользователя, извлекаем из него данные
+        if (isUser) {
+            const { phone, email, name } = extractClientDataFromMessage(message);
+            if (phone || email || name) {
+                saveClientData(phone, name, email);
+            }
+        }
+        
+        // Если это сообщение от бота, проверяем его на ключевые слова
+        if (!isUser) {
+            const keywords = [
+                'номер телефона', 'контактные данные', 'свяжется', 'оставьте номер',
+                'заполните форму', 'оставить заявку'
+            ];
+            
+            // Если в сообщении бота есть ключевые слова, заполняем формы
+            if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+                setTimeout(fillForms, 500);
+            }
+        }
+    }
+
+    // Функция для отправки сообщения
+    async function sendMessage(message) {
+        if (!message.trim()) return;
+        
+        addMessage(message, true);
+        document.getElementById('savbes-user-input').value = '';
+
+        try {
+            const response = await fetch(config.apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: sessionId
+                })
+            });
+
+            const data = await response.json();
+            addMessage(data.response, false);
+        } catch (error) {
+            console.error('Error:', error);
+            addMessage('Извините, произошла ошибка. Попробуйте позже.', false);
+        }
+    }
+
+    // Обработчик нажатия кнопки отправки
+    document.getElementById('savbes-send-button').addEventListener('click', function() {
+        const input = document.getElementById('savbes-user-input');
+        const message = input.value.trim();
+        if (message) {
+            sendMessage(message);
+        }
+    });
+
+    // Обработчик нажатия Enter
+    document.getElementById('savbes-user-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            const message = this.value.trim();
+            if (message) {
+                sendMessage(message);
+            }
+        }
+    });
+
+    // ====== Инициализация =======
+    
+    // Устанавливаем обработчики событий формы
+    setupFormValidationHandlers();
+    
+    // Заполняем формы при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        // Заполняем формы сразу
+        fillForms();
+        
+        // И периодически пытаемся заполнить (для динамически загружаемых форм)
+        setInterval(fillForms, 2000);
+    });
+    
+    // Если страница уже загружена, заполняем формы сейчас
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        fillForms();
+        setInterval(fillForms, 2000);
+    }
+    
+    // Исправляем поля с нулевыми значениями (кроме поля ввода в чате)
+    function fixZeroValueFields() {
+        document.querySelectorAll('input[type="text"]:not(#savbes-user-input), input[type="tel"], input[type="email"], input[name="name"], input[name="phone"], input[name="email"]').forEach(function(input) {
+            if (input.value === '0') {
+                input.value = '';
+                console.log('Очищено поле с нулевым значением:', input);
+            }
+            
+            // Добавляем слушатель для предотвращения установки нулевого значения, если еще не добавлен
+            if (!input._hasZeroHandler) {
+                input.addEventListener('input', function() {
+                    if (this.value === '0') {
+                        this.value = '';
+                    }
+                });
+                input._hasZeroHandler = true;
+            }
+        });
+    }
+    
+    // Запускаем исправление нулевых значений при загрузке и периодически
+    document.addEventListener('DOMContentLoaded', function() {
+        fixZeroValueFields();
+        setInterval(fixZeroValueFields, 2000);
+    });
+    
+    // Если страница уже загружена, запускаем исправление сейчас
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        fixZeroValueFields();
+        setInterval(fixZeroValueFields, 2000);
+    }
+    
+    // Выполняем однократную проверку и очистку полей с нулями через секунду
+    setTimeout(fixZeroValueFields, 1000);
+})();
